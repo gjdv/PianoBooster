@@ -30,7 +30,7 @@ may also bypass the desktop volume controls.
 
 For more information on running fluidsynth with low latency see this page:
 
-http://fluidsynth.resonance.org/trac/wiki/LowLatency
+https://github.com/FluidSynth/fluidsynth/wiki/LowLatency
 
 On PianoBooster set the Setup/Midi Setup/Midi Output Device: to "FLUID Synth (fs):0"
 
@@ -42,7 +42,7 @@ If you get an error, make sure to have snd-seq-midi kernel module loaded in your
 system (sudo modprobe snd-seq-midi).
 
 You might prefer to use qsynth as GUI interface to fluidsynth for easy setting
-of Reverbs, chorus effects, etc
+of Reverbs, chorus effects, etc.
 
 -----------------------
 
