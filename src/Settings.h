@@ -105,19 +105,19 @@ public:
     {
         return m_fluidSoundFontNames;
     }
-    void setFluidSoundFontNames(QStringList names)
+    void setFluidSoundFontNames(const QStringList &names)
     {
         m_fluidSoundFontNames = names;
     }
-    void setFluidSoundFontNames(QString names)
+    void setFluidSoundFontNames(const QString &names)
     {
         m_fluidSoundFontNames = QStringList(names);
     }
-    void addFluidSoundFontName(QString sfName)
+    void addFluidSoundFontName(const QString &sfName)
     {
         m_fluidSoundFontNames.append(sfName);
     }
-    void removeFluidSoundFontName(QString sfName)
+    void removeFluidSoundFontName(const QString &sfName)
     {
         m_fluidSoundFontNames.removeAll(sfName);
     }
@@ -130,7 +130,7 @@ public:
         setValue("FluidSynth/SoundFont", getFluidSoundFontNames());
     }
 
-    // has a new sound fount been entered that is not the same as the old sound font
+    // has a new sound font been entered that is not the same as the old sound font
     bool isNewSoundFontEntered()
     {
         if (getFluidSoundFontNames().isEmpty())

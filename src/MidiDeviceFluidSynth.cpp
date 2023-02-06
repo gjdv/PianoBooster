@@ -28,6 +28,23 @@
 
 #include "MidiDeviceFluidSynth.h"
 
+static fluid_settings_t* s_debug_fluid_settings;
+
+static void debug_settings_foreach_func (void *data,
+#if FLUIDSYNTH_VERSION_MAJOR >= 2
+    const char *name,
+#else
+    char *name,
+#endif
+    int type)
+{
+    Q_UNUSED(data)
+    Q_UNUSED(type)
+    char buffer[300];
+    fluid_settings_copystr(s_debug_fluid_settings, name, buffer, sizeof (buffer));
+    ppLogDebug("settings_foreach_func %s : %s", name , buffer );
+}
+
 CMidiDeviceFluidSynth::CMidiDeviceFluidSynth()
 {
     m_synth = nullptr;
@@ -39,7 +56,7 @@ CMidiDeviceFluidSynth::CMidiDeviceFluidSynth()
 
 CMidiDeviceFluidSynth::~CMidiDeviceFluidSynth()
 {
-    closeMidiPort(MIDI_OUTPUT, -1);
+    CMidiDeviceFluidSynth::closeMidiPort(MIDI_OUTPUT, -1); // not possible to make virtual call in d'tor
 }
 
 void CMidiDeviceFluidSynth::init()
@@ -62,11 +79,11 @@ QStringList CMidiDeviceFluidSynth::getMidiPortList(midiType_t type)
     return fontList;
 }
 
-bool CMidiDeviceFluidSynth::openMidiPort(midiType_t type, QString portName)
+bool CMidiDeviceFluidSynth::openMidiPort(midiType_t type, const QString &portName)
 {
     closeMidiPort(MIDI_OUTPUT, -1);
 
-    if (portName.length() == 0)
+    if (portName.isEmpty())
         return false;
 
     if (type == MIDI_INPUT)
@@ -88,15 +105,19 @@ bool CMidiDeviceFluidSynth::openMidiPort(midiType_t type, QString portName)
     fluid_settings_setint(m_fluidSettings, "audio.period-size", qsettings->value("FluidSynth/bufferSizeCombo", 128).toInt());
     fluid_settings_setint(m_fluidSettings, "audio.periods", qsettings->value("FluidSynth/bufferCountCombo", 4).toInt());
 
-#if defined (Q_OS_LINUX)
-    fluid_settings_setstr(m_fluidSettings, "audio.driver", qsettings->value("FluidSynth/audioDriverCombo", "alsa").toString().toStdString().c_str());
+#if !defined (Q_OS_WINDOWS)
+    fluid_settings_setstr(m_fluidSettings, "audio.driver", qsettings->value("FluidSynth/audioDriverCombo", "pulseaudio").toString().toStdString().c_str());
 #endif
 
     // Create the synthesizer.
     m_synth = new_fluid_synth(m_fluidSettings);
-
+#if (FLUIDSYNTH_VERSION_MAJOR >= 2) && (FLUIDSYNTH_VERSION_MINOR >= 2)
+    fluid_synth_reverb_on(m_synth, -1, 0);
+    fluid_synth_chorus_on(m_synth, -1, 0);
+#else
     fluid_synth_set_reverb_on(m_synth, 0);
     fluid_synth_set_chorus_on(m_synth, 0);
+#endif
 
     // Create the audio driver.
     m_audioDriver = new_fluid_audio_driver(m_fluidSettings, m_synth);
@@ -113,11 +134,16 @@ bool CMidiDeviceFluidSynth::openMidiPort(midiType_t type, QString portName)
     }
     fluid_synth_set_gain(m_synth, qsettings->value("FluidSynth/masterGainSpin", FLUID_DEFAULT_GAIN).toFloat()/100.0f );
     m_validConnection = true;
+    if (Cfg::logLevel >= LOG_LEVEL_DEBUG) {
+        s_debug_fluid_settings = m_fluidSettings;
+        fluid_settings_foreach(m_fluidSettings, 0, debug_settings_foreach_func);
+    }
     return true;
 }
 
 void CMidiDeviceFluidSynth::closeMidiPort(midiType_t type, int index)
 {
+    Q_UNUSED(index)
     m_validConnection = false;
 
     if (type != MIDI_OUTPUT)
@@ -141,10 +167,7 @@ void CMidiDeviceFluidSynth::playMidiEvent(const CMidiEvent & event)
     if (m_synth == nullptr)
         return;
 
-    int channel;
-
-    channel = event.channel() & 0x0f;
-
+    int channel = event.channel() & 0x0f;
     switch(event.type())
     {
         case MIDI_NOTE_OFF: // NOTE_OFF
@@ -177,8 +200,8 @@ void CMidiDeviceFluidSynth::playMidiEvent(const CMidiEvent & event)
             break;
 
         case  MIDI_PB_collateRawMidiData: //used for a SYSTEM_EVENT
-            if (m_rawDataIndex < arraySize(m_savedRawBytes))
-                m_savedRawBytes[m_rawDataIndex++] = event.data1();
+            if (m_rawDataIndex < arraySizeAs<unsigned int>(m_savedRawBytes))
+                m_savedRawBytes[m_rawDataIndex++] = static_cast<unsigned char>(event.data1());
             return; // Don't output any thing yet so just return
 
         case  MIDI_PB_outputRawMidiData: //used for a SYSTEM_EVENT
@@ -204,7 +227,7 @@ CMidiEvent CMidiDeviceFluidSynth::readMidiInput()
     return midiEvent;
 }
 
-int CMidiDeviceFluidSynth::midiSettingsSetStr(QString name, QString str)
+int CMidiDeviceFluidSynth::midiSettingsSetStr(const QString &name, const QString &str)
 {
     if (!m_fluidSettings)
         return 0;
@@ -212,14 +235,14 @@ int CMidiDeviceFluidSynth::midiSettingsSetStr(QString name, QString str)
     return fluid_settings_setstr(m_fluidSettings, (char *)qPrintable(name), (char *)qPrintable(str));
 }
 
-int CMidiDeviceFluidSynth::midiSettingsSetNum(QString name, double val)
+int CMidiDeviceFluidSynth::midiSettingsSetNum(const QString &name, double val)
 {
     if (!m_fluidSettings)
         return 0;
     return fluid_settings_setnum(m_fluidSettings, (char *)qPrintable(name), val);
 }
 
-int CMidiDeviceFluidSynth::midiSettingsSetInt(QString name, int val)
+int CMidiDeviceFluidSynth::midiSettingsSetInt(const QString &name, int val)
 {
     if (!m_fluidSettings)
         return 0;
@@ -227,16 +250,18 @@ int CMidiDeviceFluidSynth::midiSettingsSetInt(QString name, int val)
     return fluid_settings_setint(m_fluidSettings, (char *)qPrintable(name), val);
 }
 
-QString CMidiDeviceFluidSynth::midiSettingsGetStr(QString name)
+QString CMidiDeviceFluidSynth::midiSettingsGetStr(const QString &name)
 {
-    char buffer[200];
-    if (!m_fluidSettings)
-        return QString();
+    Q_UNUSED(name)
+    //char buffer[200];
+    //if (!m_fluidSettings)
+    //    return QString();
     //fluid_settings_getstr(m_fluidSettings, (char *)qPrintable(name), buffer );
-    return QString( buffer );
+    //return QString( buffer );
+    return QString(); // FIXME: buffer is never initialized here, let's just return QString() for now
 }
 
-double CMidiDeviceFluidSynth::midiSettingsGetNum(QString name)
+double CMidiDeviceFluidSynth::midiSettingsGetNum(const QString &name)
 {
     if (!m_fluidSettings)
         return 0.0;
@@ -245,7 +270,7 @@ double CMidiDeviceFluidSynth::midiSettingsGetNum(QString name)
     return val;
 }
 
-int CMidiDeviceFluidSynth::midiSettingsGetInt(QString name)
+int CMidiDeviceFluidSynth::midiSettingsGetInt(const QString &name)
 {
     if (!m_fluidSettings)
         return 0;

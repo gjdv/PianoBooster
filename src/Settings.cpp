@@ -529,7 +529,7 @@ void CSettings::setChannelHands(int left, int right)
 void CSettings::updateWarningMessages()
 {
     if (!m_song->validMidiOutput())
-        m_warningMessage = tr("ERROR NO SOUND: To fix this use menu Setup/Midi Setup ...");
+        m_warningMessage = tr("ERROR NO SOUND: To fix this use menu Setup/MIDI Setup ...");
     else if (m_currentSongName.isEmpty())
         m_warningMessage = tr("ERROR NO MIDI FILE: To fix this use menu File/Open ...");
     else
@@ -557,7 +557,7 @@ void CSettings::setupDefaultSoundFont(){
         QStringList dirList = directory.entryList(QStringList(),QDir::AllEntries);
         foreach(QString filename, dirList)
         {
-            // Find the first sound fount file
+            // Find the first sound font file
             if ( filename.endsWith(".sf2", Qt::CaseInsensitive ) )
             {
                 defaultSoundFont.setFile(directory.path(), filename);

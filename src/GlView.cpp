@@ -28,8 +28,11 @@
 
 #include <QtWidgets>
 #include <QtOpenGL>
+#include <QOpenGLFunctions>
+#include <QOpenGLFunctions_1_1>
+#include <QPaintEngine>
 
-#include <math.h>
+#include <cmath>
 
 #include "QtWindow.h"
 #include "GlView.h"
@@ -45,7 +48,7 @@
 #define TEXT_LEFT_MARGIN 30
 
 CGLView::CGLView(QtWindow* parent, CSettings* settings)
-    : QGLWidget(parent)
+    : QOpenGLWidget(parent)
 {
     m_qtWindow = parent;
     m_settings = settings;
@@ -177,8 +180,8 @@ void CGLView::drawAccurracyBar()
     float accuracy;
     CColor color;
 
-    float y = Cfg::getAppHeight() - 14;
-    const float x = accuracyBarStart;
+    float y = static_cast<float>(Cfg::getAppHeight() - 14);
+    const float x = static_cast<float>(accuracyBarStart);
     const int width = 360;
     const int lineWidth = 8/2;
 
@@ -216,12 +219,12 @@ void CGLView::drawDisplayText()
 
     if (!m_settings->getWarningMessage().isEmpty())
     {
-        glColor3f(1.0,0.2,0.0);
+        glColor3f(1.0f,0.2f,0.0f);
         renderText(TEXT_LEFT_MARGIN, y-4, 0, m_settings->getWarningMessage(), m_timeRatingFont);
         return;
     }
 
-    glColor3f(1.0,1.0,1.0);
+    glColor3f(1.0f,1.0f,1.0f);
 
     if (m_song->getPlayMode() != PB_PLAY_MODE_listen) {
         if (accuracyBarStart == 0) {
@@ -254,13 +257,13 @@ void CGLView::drawBarNumber()
         return;
     m_forceBarRedraw--;
 
-    float y = Cfg::getAppHeight() - m_titleHeight - 34;
-    float x = TEXT_LEFT_MARGIN;
+    const auto y = static_cast<float>(Cfg::getAppHeight() - m_titleHeight - 34);
+    const auto x = static_cast<float>(TEXT_LEFT_MARGIN);
 
     //CDraw::drColor (Cfg::backgroundColor());
     //CDraw::drColor (Cfg::noteColorDim());
     //glRectf(x+30+10, y-2, x + 80, y + 16);
-    glColor3f(1.0,1.0,1.0);
+    glColor3f(1.0f,1.0f,1.0f);
     renderText(x, y, 0, tr("Bar:") + " " + QString::number(m_song->getBarNumber()), m_timeRatingFont);
 }
 
@@ -295,30 +298,29 @@ void CGLView::resizeGL(int width, int height)
     }
     int sizeX = qMin(width, maxSoreWidth);
     int sizeY = qMin(height, maxSoreHeight);
-    int x = (width - sizeX)/2;
-    int y = (height - sizeY)/2;
-    y = (height - sizeY) - 5;
-    x = 0;
-
+    int x = 0;
+    int y = (height - sizeY) - 5;
     glViewport (x, y, sizeX, sizeY);
 
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     glOrtho(0, sizeX, 0, sizeY, -1.0, 1.0);
     glMatrixMode(GL_MODELVIEW);
-    CStavePos::setStaveCenterY(sizeY - maxSoreHeight/2 - m_titleHeight/2);
+    CStavePos::setStaveCenterY(static_cast<float>(sizeY) - static_cast<float>(maxSoreHeight)/2.0f - static_cast<float>(m_titleHeight)/2.0f);
     Cfg::setAppDimentions(x, y, sizeX, sizeY);
-    Cfg::setStaveEndX(sizeX - staveEndGap);
-    CStavePos::setStaveCentralOffset(staveGap/2);
+    Cfg::setStaveEndX(static_cast<float>(sizeX - staveEndGap));
+    CStavePos::setStaveCentralOffset(static_cast<float>(staveGap)/2.0f);
     CDraw::forceCompileRedraw();
 }
 
 void CGLView::mousePressEvent(QMouseEvent *event)
 {
+    Q_UNUSED(event)
 }
 
 void CGLView::mouseMoveEvent(QMouseEvent *event)
 {
+    Q_UNUSED(event)
 }
 
 void CGLView::initializeGL()
@@ -337,6 +339,10 @@ void CGLView::initializeGL()
 
     //glGenTextures(1, &texName);
     //glBindTexture(GL_TEXTURE_2D, texName);
+
+    if (format().samples() > 0) {
+        glEnable(GL_MULTISAMPLE);
+    }
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -360,7 +366,7 @@ void CGLView::initializeGL()
 
     m_song->regenerateChordQueue();
 
-    // increased the tick time for Midi handling
+    // increased the tick time for MIDI handling
 
     m_timer.start(Cfg::tickRate, this );
 
@@ -371,8 +377,7 @@ void CGLView::initializeGL()
 
 void CGLView::updateMidiTask()
 {
-    int ticks;
-    ticks = m_realtime.restart();
+    const auto ticks = m_realtime.restart();
     m_displayUpdateTicks += ticks;
     m_eventBits |= m_song->task(ticks);
 }
@@ -416,12 +421,207 @@ void CGLView::timerEvent(QTimerEvent *event)
     else
         m_fullRedrawFlag = false;
 
-    glDraw();
-    //update();
+    //glDraw();
+    update();
     m_fullRedrawFlag = true;
     BENCHMARK(19, "timer exit");
 }
 
 void CGLView::mediaTimerEvent(int ticks)
 {
+    Q_UNUSED(ticks)
+}
+
+#ifndef QT_OPENGL_ES
+
+static void qt_save_gl_state(QOpenGLFunctions_1_1 *functions1_1)
+{
+    functions1_1->glPushClientAttrib(GL_CLIENT_ALL_ATTRIB_BITS);
+    functions1_1->glPushAttrib(GL_ALL_ATTRIB_BITS);
+    functions1_1->glMatrixMode(GL_TEXTURE);
+    functions1_1->glPushMatrix();
+    functions1_1->glLoadIdentity();
+    functions1_1->glMatrixMode(GL_PROJECTION);
+    functions1_1->glPushMatrix();
+    functions1_1->glMatrixMode(GL_MODELVIEW);
+    functions1_1->glPushMatrix();
+
+    functions1_1->glShadeModel(GL_FLAT);
+    functions1_1->glDisable(GL_CULL_FACE);
+    functions1_1->glDisable(GL_LIGHTING);
+    functions1_1->glDisable(GL_STENCIL_TEST);
+    functions1_1->glDisable(GL_DEPTH_TEST);
+    functions1_1->glEnable(GL_BLEND);
+    functions1_1->glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+}
+
+static void qt_restore_gl_state(QOpenGLFunctions_1_1 *functions1_1)
+{
+    functions1_1->glMatrixMode(GL_TEXTURE);
+    functions1_1->glPopMatrix();
+    functions1_1->glMatrixMode(GL_PROJECTION);
+    functions1_1->glPopMatrix();
+    functions1_1->glMatrixMode(GL_MODELVIEW);
+    functions1_1->glPopMatrix();
+    functions1_1->glPopAttrib();
+    functions1_1->glPopClientAttrib();
+}
+
+static void qt_gl_draw_text(QOpenGLFunctions *functions, QPainter *p, int x, int y, const QString &str,
+                            const QFont &font)
+{
+    GLfloat color[4];
+    functions->glGetFloatv(GL_CURRENT_COLOR, &color[0]);
+
+    const auto col = QColor::fromRgbF(color[0], color[1], color[2],color[3]);
+    QPen old_pen = p->pen();
+    QFont old_font = p->font();
+
+    p->setPen(col);
+    p->setFont(font);
+    p->drawText(x, y, str);
+
+    p->setPen(old_pen);
+    p->setFont(old_font);
+}
+
+static inline void transform_point(GLdouble out[4], const GLdouble m[16], const GLdouble in[4])
+{
+#define M(row,col)  m[col*4+row]
+    out[0] =
+        M(0, 0) * in[0] + M(0, 1) * in[1] + M(0, 2) * in[2] + M(0, 3) * in[3];
+    out[1] =
+        M(1, 0) * in[0] + M(1, 1) * in[1] + M(1, 2) * in[2] + M(1, 3) * in[3];
+    out[2] =
+        M(2, 0) * in[0] + M(2, 1) * in[1] + M(2, 2) * in[2] + M(2, 3) * in[3];
+    out[3] =
+        M(3, 0) * in[0] + M(3, 1) * in[1] + M(3, 2) * in[2] + M(3, 3) * in[3];
+#undef M
+}
+
+static inline GLint qgluProject(GLdouble objx, GLdouble objy, GLdouble objz,
+           const GLdouble model[16], const GLdouble proj[16],
+           const GLint viewport[4],
+           GLdouble * winx, GLdouble * winy, GLdouble * winz)
+{
+   GLdouble in[4], out[4];
+
+   in[0] = objx;
+   in[1] = objy;
+   in[2] = objz;
+   in[3] = 1.0;
+   transform_point(out, model, in);
+   transform_point(in, proj, out);
+
+   if (in[3] == 0.0)
+      return GL_FALSE;
+
+   in[0] /= in[3];
+   in[1] /= in[3];
+   in[2] /= in[3];
+
+   *winx = viewport[0] + (1 + in[0]) * viewport[2] / 2;
+   *winy = viewport[1] + (1 + in[1]) * viewport[3] / 2;
+
+   *winz = (1 + in[2]) / 2;
+   return GL_TRUE;
+}
+
+#endif // !QT_OPENGL_ES
+
+/*!
+ * \brief Renders the string \a str into the GL context of this widget.
+ *
+ * \a x, \a y and \a z are specified in scene or object coordinates
+ * relative to the currently set projection and model matrices. This
+ * can be useful if you want to annotate models with text labels and
+ * have the labels move with the model as it is rotated etc.
+ *
+ * \remarks
+ * - Taken from Qt 5's QGLWidget implementation (found in
+ *   `qtbase/src/opengl/qgl.cpp`). The same counts for the static helper
+ *   functions defined above.
+ * - Handling the translation for the \a z coordinate has been removed
+ *   as it is not used here anyways.
+ */
+void CGLView::renderText(double x, double y, double z, const QString &str, const QFont & font = QFont()) {
+#ifndef QT_OPENGL_ES
+    auto *const ctx = context();
+    auto *const gl1funcs =
+#if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
+QOpenGLVersionFunctionsFactory::get<QOpenGLFunctions_1_1>(ctx);
+#else
+ctx->versionFunctions<QOpenGLFunctions_1_1>();
+#endif
+    if (!ctx->isOpenGLES() && gl1funcs) {
+        if (str.isEmpty() || !isValid())
+            return;
+
+        QOpenGLFunctions *const funcs = ctx->functions();
+
+        QPaintEngine *engine = paintEngine();
+
+        QPainter *p;
+        bool reuse_painter = false;
+        bool use_depth_testing = funcs->glIsEnabled(GL_DEPTH_TEST);
+        bool use_scissor_testing = funcs->glIsEnabled(GL_SCISSOR_TEST);
+
+        qt_save_gl_state(gl1funcs);
+
+        if (engine->isActive()) {
+            reuse_painter = true;
+            p = engine->painter();
+        } else {
+            p = new QPainter(this);
+        }
+
+        const auto *const dev = p->device();
+        const auto width = dev ? dev->width() : this->width();
+        const auto height = dev ? dev->height() : this->height();
+        const auto dpr = dev ? dev->devicePixelRatioF() : 1.0;
+        GLdouble model[4 * 4], proj[4 * 4];
+        GLint view[4];
+        gl1funcs->glGetDoublev(GL_MODELVIEW_MATRIX, &model[0]);
+        gl1funcs->glGetDoublev(GL_PROJECTION_MATRIX, &proj[0]);
+        funcs->glGetIntegerv(GL_VIEWPORT, &view[0]);
+        GLdouble win_x = 0, win_y = 0, win_z = 0;
+        qgluProject(x, y, z, &model[0], &proj[0], &view[0],
+                    &win_x, &win_y, &win_z);
+        win_x /= dpr;
+        win_y /= dpr;
+        win_y = height + 4 - win_y; // y is inverted
+        // note: Not sure why this is rendered 4 pixels to high, just putting "+ 4" there for now.
+
+        QRect viewport(view[0], view[1], view[2], view[3]);
+        if (!use_scissor_testing && viewport != rect()) {
+            funcs->glScissor(view[0], view[1], view[2], view[3]);
+            funcs->glEnable(GL_SCISSOR_TEST);
+        } else if (use_scissor_testing) {
+            funcs->glEnable(GL_SCISSOR_TEST);
+        }
+        funcs->glViewport(0, 0, static_cast<GLsizei>(width * dpr), static_cast<GLsizei>(height * dpr));
+        gl1funcs->glAlphaFunc(GL_GREATER, 0.0);
+        funcs->glEnable(GL_ALPHA_TEST);
+        if (use_depth_testing)
+            funcs->glEnable(GL_DEPTH_TEST);
+
+        qt_gl_draw_text(funcs, p, qRound(win_x), qRound(win_y), str, font);
+
+        if (!reuse_painter) {
+            p->end();
+            delete p;
+        }
+
+        qt_restore_gl_state(gl1funcs);
+
+        return;
+    }
+#else // QT_OPENGL_ES
+    Q_UNUSED(x);
+    Q_UNUSED(y);
+    Q_UNUSED(z);
+    Q_UNUSED(str);
+    Q_UNUSED(font);
+#endif
+    qWarning("QGLWidget::renderText is not supported under OpenGL/ES");
 }

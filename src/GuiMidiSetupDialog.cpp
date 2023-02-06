@@ -24,6 +24,7 @@
 
 */
 
+#include <QFileInfo>
 #include <QtWidgets>
 
 #include "GuiMidiSetupDialog.h"
@@ -46,7 +47,7 @@ GuiMidiSetupDialog::GuiMidiSetupDialog(QWidget *parent)
     midiSetupTabWidget->removeTab(midiSetupTabWidget->indexOf(tab_2));
 #endif
 
-    setWindowTitle(tr("Midi Setup"));
+    setWindowTitle(tr("MIDI Setup"));
 }
 
 void GuiMidiSetupDialog::init(CSong* song, CSettings* settings)
@@ -82,7 +83,9 @@ void GuiMidiSetupDialog::init(CSong* song, CSettings* settings)
 
 #if defined (Q_OS_LINUX)
     audioDriverCombo->addItems({"pulseaudio", "alsa"});
-#elif defined (Q_OS_UNIX) || defined (Q_OS_DARWIN)
+#elif defined (Q_OS_DARWIN)
+    audioDriverCombo->addItems({"coreaudio", "portaudio"});
+#elif defined (Q_OS_UNIX)
     audioDriverCombo->addItems({"pulseaudio"});
 #endif
 
@@ -141,19 +144,19 @@ void GuiMidiSetupDialog::updateMidiInfoText()
     if (midiInputCombo->currentIndex() == 0)
         midiInfoText->append("<span style=\"color:black\">" + tr("If you don't have a MIDI keyboard you can use the PC keyboard; 'X' is middle C.") + "</span>");
     else if (midiInputCombo->currentText().contains("Midi Through", Qt::CaseInsensitive))
-        midiInfoText->append("<span style=\"color:#FF6600\">" + tr("The use of Midi Through is not recommended!") + "</span>");
+        midiInfoText->append("<span style=\"color:#FF6600\">" + tr("The use of MIDI Through is not recommended!") + "</span>");
     else
-        midiInfoText->append("<span style=\"color:gray\">" + tr("Midi Input Device:") + " " + midiInputCombo->currentText() +"</span>");
+        midiInfoText->append("<span style=\"color:gray\">" + tr("MIDI Input Device:") + " " + midiInputCombo->currentText() +"</span>");
 
     if (midiOutputCombo->currentText() == tr("None"))
-        midiInfoText->append("<span style=\"color:red\">" + tr("No Sound Output Device selected; Choose a Midi Output Device") + "</span>");
-    else if (midiOutputCombo->currentText().contains("Midi Through", Qt::CaseInsensitive))
-        midiInfoText->append("<span style=\"color:#FF6600\">" + tr("The use of Midi Through is not recommended!") + "</span>");
+        midiInfoText->append("<span style=\"color:red\">" + tr("No Sound Output Device selected; Choose a MIDI Output Device") + "</span>");
+    else if (midiOutputCombo->currentText().contains("MIDI Through", Qt::CaseInsensitive))
+        midiInfoText->append("<span style=\"color:#FF6600\">" + tr("The use of MIDI Through is not recommended!") + "</span>");
     else if (midiOutputCombo->currentText().contains("Microsoft GS Wavetable", Qt::CaseInsensitive))
         midiInfoText->append("<span style=\"color:#FF6600\">" + tr("Note: the Microsoft GS Wavetable Synth introduces an unwanted delay!") + "\n"
                                 + tr("(Try a latency fix of 150msc)") + "</span>");
     else
-        midiInfoText->append("<span style=\"color:gray\">" + tr("Midi Output Device:") + " " + midiOutputCombo->currentText() +"</span>");
+        midiInfoText->append("<span style=\"color:gray\">" + tr("MIDI Output Device:") + " " + midiOutputCombo->currentText() +"</span>");
 
     latencyFixLabel->setText(tr("%1 mSec").arg(m_latencyFix));
 
@@ -162,16 +165,19 @@ void GuiMidiSetupDialog::updateMidiInfoText()
 
 void GuiMidiSetupDialog::on_midiInputCombo_activated (int index)
 {
+    Q_UNUSED(index)
     updateMidiInfoText();
 }
 
 void GuiMidiSetupDialog::on_midiOutputCombo_activated (int index)
 {
+    Q_UNUSED(index)
     updateMidiInfoText();
 }
 
 void GuiMidiSetupDialog::on_latencyFixButton_clicked ( bool checked )
 {
+    Q_UNUSED(checked)
     bool ok;
     int latencyFix = QInputDialog::getInt(this, tr("Enter a value for the latency fix in milliseconds"),
             tr(
@@ -272,6 +278,7 @@ void GuiMidiSetupDialog::updateFluidInfoStatus()
 
 void GuiMidiSetupDialog::on_fluidLoadButton_clicked ( bool checked )
 {
+    Q_UNUSED(checked)
 #if WITH_INTERNAL_FLUIDSYNTH
     QString lastSoundFont = m_settings->value("LastSoundFontDir","").toString();
 
@@ -284,19 +291,19 @@ void GuiMidiSetupDialog::on_fluidLoadButton_clicked ( bool checked )
         possibleSoundFontFolders.push_back("/usr/share/soundfonts");
         possibleSoundFontFolders.push_back("/usr/share/sounds/sf2");
 #endif
-        for (QString soundFontFolder:possibleSoundFontFolders){
-            QDir dir(soundFontFolder);
-            if (dir.exists()){
+        for (const QString &soundFontFolder : possibleSoundFontFolders){
+            if (QDir(soundFontFolder).exists()){
                 lastSoundFont=soundFontFolder;
                 break;
             }
         }
     }
 
-    QFileInfo soundFontInfo = QFileDialog::getOpenFileName(this, tr("Open SoundFont File for fluidsynth"),
+    const auto soundFontFile = QFileDialog::getOpenFileName(this, tr("Open SoundFont File for fluidsynth"),
                             lastSoundFont, tr("SoundFont Files (*.sf2 *.sf3)"));
-    if (!soundFontInfo.isFile()) return;
+    if (soundFontFile.isEmpty()) return;
 
+    const auto soundFontInfo = QFileInfo(soundFontFile);
     m_settings->setFluidSoundFontNames(soundFontInfo.filePath());
     m_settings->setValue("LastSoundFontDir", soundFontInfo.path());
 
@@ -315,6 +322,7 @@ void GuiMidiSetupDialog::on_fluidLoadButton_clicked ( bool checked )
 }
 
 void GuiMidiSetupDialog::on_fluidClearButton_clicked( bool checked ){
+    Q_UNUSED(checked)
 #if WITH_INTERNAL_FLUIDSYNTH
     m_settings->clearFluidSoundFontNames();
     int i = midiOutputCombo->findText(CMidiDeviceFluidSynth::getFluidInternalName());

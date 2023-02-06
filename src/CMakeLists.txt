@@ -44,6 +44,7 @@ MESSAGE("PREFIX: " ${CMAKE_INSTALL_PREFIX})
 MESSAGE("DATA_DIR: " ${DATA_DIR})
 MESSAGE("CMAKE_INSTALL_BINDIR: " ${CMAKE_INSTALL_BINDIR})
 
+set(OpenGL_GL_PREFERENCE "GLVND")
 FIND_PACKAGE( OpenGL REQUIRED )
 
 if(NOT WIN32)
@@ -71,8 +72,15 @@ if(NO_LANGS)
     add_compile_options("-DNO_LANGS")
 endif()
 
-# Finds Qt5 libraries
-FIND_PACKAGE( Qt5 REQUIRED COMPONENTS Core Gui Widgets LinguistTools OpenGL Xml )
+# Finds Qt libraries
+set(QT_PACKAGE_NAME Qt5 CACHE STRING "Name of the Qt package to use, set e.g. to \"Qt6\" to use Qt 6")
+set(QT_COMPONENTS Core Gui Widgets LinguistTools OpenGL Xml)
+set(QT_LIBS ${QT_PACKAGE_NAME}::Core ${QT_PACKAGE_NAME}::Gui ${QT_PACKAGE_NAME}::Widgets ${QT_PACKAGE_NAME}::Xml ${QT_PACKAGE_NAME}::OpenGL)
+if (QT_PACKAGE_NAME STREQUAL Qt6)
+    list(APPEND QT_COMPONENTS OpenGLWidgets Core5Compat)
+    list(APPEND QT_LIBS ${QT_PACKAGE_NAME}::OpenGLWidgets ${QT_PACKAGE_NAME}::Core5Compat)
+endif ()
+FIND_PACKAGE( "${QT_PACKAGE_NAME}" REQUIRED COMPONENTS ${QT_COMPONENTS})
 
 add_compile_options(-fPIC)
 
@@ -148,6 +156,7 @@ else()
         MESSAGE(FATAL_ERROR "rtmidi not found (Try building with option USE_BUNDLED_RTMIDI=ON)")
     endif(NOT RTMIDI_FOUND)
     include_directories(${RTMIDI_INCLUDE_DIRS})
+    link_directories(${RTMIDI_LIBRARY_DIRS})
 endif()
 
 # with SET() command you can change variables or define new ones
@@ -256,14 +265,12 @@ if(WIN32)
     SET_TARGET_PROPERTIES(pianobooster PROPERTIES LINK_FLAGS "-mwindows")
 endif(WIN32)
 
-qt5_use_modules(pianobooster Core Gui Widgets LinguistTools OpenGL Xml)
-
 if(${CMAKE_VERSION} VERSION_LESS "3.13.0")
     message("Please consider to switch to CMake 3.13.0")
 else()
     target_link_directories(pianobooster PUBLIC ${FTGL_LIBRARY_DIRS} ${JACK_LIBRARY_DIRS} ${FLUIDSYNTH_LIBRARY_DIRS})
 endif()
-target_link_libraries (pianobooster Qt5::Widgets Qt5::Xml Qt5::OpenGL ${OPENGL_LIBRARIES} ${FTGL_LIBRARY} ${RTMIDI_LIBRARIES} ${JACK_LIBRARY} ${FLUIDSYNTH_LIBRARY} ${RTMIDI_LIBRARY})
+target_link_libraries (pianobooster ${QT_LIBS} ${OPENGL_LIBRARIES} ${FTGL_LIBRARY} ${RTMIDI_LIBRARIES} ${JACK_LIBRARY} ${FLUIDSYNTH_LIBRARY} ${RTMIDI_LIBRARY})
 
 if(NOT APPLE)
     INSTALL( FILES ../pianobooster.desktop DESTINATION share/applications )
@@ -315,6 +322,56 @@ endif()
 if(DEBUG_LOG_TIMING)
     ADD_DEFINITIONS(-DPB_LOG_TIMING)
 endif()
+
+# allow enabling useful warnings (explicitly disabling not useful ones) and allow treating warnings them as errors
+# note: code copied from: https://github.com/Martchus/cpp-utilities/blob/d8c38699ba41b048c61662786c69eb02ff7eaca7/cmake/modules/BasicConfig.cmake
+option(ENABLE_WARNINGS "adds additional compiler flags to enable useful warnings" OFF)
+set(CLANG_WARNINGS
+    -Wall
+    -Wextra # reasonable and standard
+    -Wshadow=local # warn the user if a variable declaration shadows one from a parent context
+    -Wnon-virtual-dtor # warn the user if a class with virtual functions has a non-virtual destructor. This helps catch hard
+                       # to track down memory errors
+    -Wold-style-cast # warn for c-style casts
+    -Wcast-align # warn for potential performance problem casts
+    -Wunused # warn on anything being unused
+    -Woverloaded-virtual # warn if you overload (not override) a virtual function
+    -Wconversion # warn on type conversions that may lose data
+    -Wsign-conversion # warn on sign conversions
+    -Wnull-dereference # warn if a null dereference is detected
+    -Wdouble-promotion # warn if float is implicit promoted to double
+    -Wformat=2 # warn on security issues around functions that format output (ie printf)
+    -Wno-pedantic # warn NOT if non-standard C++ is used (some vendor extensions are very useful)
+    -Wno-missing-field-initializers # warn NOT about missing field initializers
+    -Wno-useless-cast # warn NOT about useless cases (this is sometimes very useful in templates)
+    -Wno-unused-const-variable # warn NOT about unused constants (usually used in other compile unit)
+    -Wno-unknown-warning-option # warn NOT about unknown warning options (depending on compiler/version not all are
+                                # available)
+)
+set(GCC_WARNINGS
+    ${CLANG_WARNINGS}
+    -Wmisleading-indentation # warn if indentation implies blocks where blocks do not exist
+    -Wduplicated-cond # warn if if / else chain has duplicated conditions
+    -Wduplicated-branches # warn if if / else branches have duplicated code
+    -Wlogical-op # warn about logical operations being used where bitwise were probably wanted
+)
+if (ENABLE_WARNINGS)
+    if (CMAKE_CXX_COMPILER_ID MATCHES ".*Clang")
+        target_compile_options(pianobooster PRIVATE ${CLANG_WARNINGS})
+    elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(pianobooster PRIVATE ${GCC_WARNINGS})
+    else ()
+        message(AUTHOR_WARNING "Enabling warnings is not supported for compiler '${CMAKE_CXX_COMPILER_ID}'.")
+    endif ()
+endif ()
+option(TREAT_WARNINGS_AS_ERRORS "adds additional compiler flag to treat warnings as errors" "${ENABLE_DEVEL_DEFAULTS}")
+if (TREAT_WARNINGS_AS_ERRORS)
+    if (CMAKE_CXX_COMPILER_ID MATCHES ".*Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        target_compile_options(pianobooster PRIVATE -Werror)
+    else ()
+        message(AUTHOR_WARNING "Treating warnings as errors is not supported for compiler '${CMAKE_CXX_COMPILER_ID}'.")
+    endif ()
+endif ()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/../music/BoosterMusicBooks.zip ${CMAKE_CURRENT_BINARY_DIR}/ COPYONLY)
 

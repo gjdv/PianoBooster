@@ -83,21 +83,21 @@ public:
             m_offsetY -= staveCentralOffset();
     }
 
-    void notePos(whichPart_t hand, int midiNote);
+    void notePos(whichPart_t hand, int midiNote, int clef = -1); // in fact clef is of type musicalSymbol_t but causes circular reference
 
     ////////////////////////////////////////////////////////////////////////////////
     //! @brief Sets which stave the note will appear on
     //! return          The position on the stave.
     float getPosY()
     {
-        return verticalNoteSpacing() * m_staveIndex + m_offsetY ;
+        return verticalNoteSpacing() * static_cast<float>(m_staveIndex) + m_offsetY;
     }
 
     float getPosYAccidental() {
         int accidental = m_accidental;
         if (accidental == 2) accidental = 1;
         else if (accidental == -2) accidental = -1;
-        return getPosY() + accidental*verticalNoteSpacing()/2;
+        return getPosY() + static_cast<float>(accidental) * verticalNoteSpacing() / 2;
     }
     float getPosYRelative() { return getPosY() - m_staveCenterY;} // get the Y position relative to the stave centre
 
@@ -143,7 +143,7 @@ public:
 
 private:
     // fixme TODO This could be improved as the calculations could a done in the constructor
-    int8_t m_staveIndex;    // 0 central line, 5 = top line, -5 the bottom line,
+    int m_staveIndex;    // 0 central line, 5 = top line, -5 the bottom line,
     int m_accidental;         // 0 = none, 1=sharp, -1 =flat, 2=natural
     float m_offsetY;
     whichPart_t m_hand;

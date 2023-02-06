@@ -36,9 +36,7 @@ int CMidiFile::readWord(void)
 
 int CMidiFile::readHeader(void)
 {
-    size_t i;
-    int c;
-
+    int i, c;
     for ( i=0; i < 4; i++)
     {
         c = m_file.get();
@@ -76,7 +74,7 @@ int CMidiFile::readHeader(void)
     return i;
 }
 
-void CMidiFile::openMidiFile(string filename)
+void CMidiFile::openMidiFile(const std::string &filename)
 {
     if (m_file.is_open())
         m_file.close();
@@ -85,22 +83,20 @@ void CMidiFile::openMidiFile(string filename)
     m_file.open(filename.c_str(), ios_base::in | ios_base::binary);
     if (m_file.fail() == true)
     {
-        QMessageBox::warning(nullptr, QMessageBox::tr("Midi File Error"),
-                 QMessageBox::tr("Cannot open \"%1\"").arg(QString(filename.c_str())));
+        QMessageBox::warning(nullptr, QMessageBox::tr("MIDI File Error"),
+                 QMessageBox::tr("Cannot open \"%1\"").arg(QString::fromStdString(filename)));
         midiError(SMF_CANNOT_OPEN_FILE);
         return;
     }
     rewind();
     if (getMidiError() != SMF_NO_ERROR)
-        QMessageBox::warning(nullptr, QMessageBox::tr("Midi File Error"),
-                 QMessageBox::tr("Midi file \"%1\" is corrupted").arg(QString(filename.c_str())));
+        QMessageBox::warning(nullptr, QMessageBox::tr("MIDI File Error"),
+                 QMessageBox::tr("MIDI file \"%1\" is corrupted").arg(QString::fromStdString(filename)));
 }
 
 void CMidiFile::rewind()
 {
     m_numberOfTracks = 0;
-    size_t ntrks;
-    size_t trk;
     dword_t trackLength;
     streampos filePos;
 
@@ -109,30 +105,27 @@ void CMidiFile::rewind()
 
     m_file.seekg (0, ios::beg);
 
-    ntrks = readHeader();
+    const auto ntrks = readHeader();
     if (ntrks == 0)
     {
         midiError(SMF_CORRUPTED_MIDI_FILE);
         ppLogError("Zero tracks in SMF file");
         return;
     }
-    if (ntrks > arraySize(m_tracks))
+    if (ntrks < 0 || ntrks > arraySize(m_tracks))
     {
         midiError(SMF_ERROR_TOO_MANY_TRACK);
         ppLogError("Too many tracks in SMF file");
         return;
     }
     m_numberOfTracks = ntrks;
-    for (trk = 0; trk < arraySize(m_tracks); trk++)
+    for (int trk = 0; trk < arraySize(m_tracks); ++trk)
     {
-        if (m_tracks[trk]!= nullptr)
-        {
-            delete (m_tracks[trk]);
-            m_tracks[trk] = nullptr;
-        }
+        delete m_tracks[trk];
+        m_tracks[trk] = nullptr;
     }
     filePos = m_file.tellg();
-    for (trk = 0; trk < ntrks; trk++)
+    for (auto trk = 0; trk < ntrks; ++trk)
     {
         m_tracks[trk] = new CMidiTrack(m_file, trk);
         trackLength = m_tracks[trk]->getTrackLength();
@@ -144,7 +137,7 @@ void CMidiFile::rewind()
             break;
         }
         //now move onto the next track
-        filePos += trackLength;
+        filePos += static_cast<streamoff>(trackLength);
         m_file.seekg (filePos, ios::beg);
     }
     m_songTitle = m_tracks[0]->getTrackName();

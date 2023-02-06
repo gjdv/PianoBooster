@@ -52,11 +52,11 @@ public:
     void refresh();
 
     void loadBookList();
-    void setBookName(QString bookName);
-    void setSongName(QString songName);
+    void setBookName(const QString &bookName);
+    void setSongName(const QString &songName);
     int getSongIndex() {return songCombo->currentIndex();}
     void setSongIndex(int index){songCombo->setCurrentIndex(index);}
-    void setCurrentHand(QString hand);
+    void setCurrentHand(const QString &hand);
 
     bool isRepeatSong(){return repeatSong->isChecked();}
 
@@ -144,6 +144,25 @@ private slots:
     }
 
     void on_rhythmTappingCombo_activated (int index);
+
+    void on_clefComboChange (const QString &name, int value);
+    void on_clefComboChange (const QString &name, const QString &text)
+    {
+    	int value = -1;
+    	if (text.toLower() == "treble")
+    		value = PB_SYMBOL_gClef;
+    	else if (text.toLower() == "bass")
+    		value = PB_SYMBOL_fClef;
+    	on_clefComboChange(name, value);
+    }
+    void on_clefRightComboChange (const QString &text)
+    {
+    	on_clefComboChange("SidePanel/clefRight", text);
+    }
+    void on_clefLeftComboChange (const QString &text)
+    {
+    	on_clefComboChange("SidePanel/clefLeft", text);
+    }
 
     void on_muteYourPartCheck_toggled (bool checked)
     {

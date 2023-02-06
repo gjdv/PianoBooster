@@ -19,50 +19,33 @@
 
 ****************************************************************************/
 
-#ifdef _WIN32
-  #include <windows.h>
-#endif
-
-#ifdef __APPLE__
-  #include <OpenGL/gl.h>
-  #include <OpenGL/glu.h>
-#else
-  #include <GL/gl.h>
-  #include <GL/glu.h>
-#endif
-
 #include <QApplication>
-#include <QtOpenGL>
+
+#include <cstdlib>
+
 #include "QtWindow.h"
 #include "version.h"
 
 int main(int argc, char *argv[]){
-    QCoreApplication::setOrganizationName("PianoBooster");
-    QCoreApplication::setOrganizationDomain("https://github.com/pianobooster/PianoBooster");
-    QCoreApplication::setApplicationName("Piano Booster");
-    QCoreApplication::setApplicationVersion(PB_VERSION);
+    QCoreApplication::setOrganizationName(QStringLiteral("PianoBooster"));
+    QCoreApplication::setOrganizationDomain(QStringLiteral("https://github.com/pianobooster/PianoBooster"));
+    QCoreApplication::setApplicationName(QStringLiteral("Piano Booster"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(PB_VERSION));
+    QGuiApplication::setDesktopFileName(QStringLiteral("pianobooster"));
 
     {
         QCoreApplication app(argc, argv);
         QStringList argList = QCoreApplication::arguments();
-        for (QString arg:argList){
-            if (arg=="--version"){
+        for (const QString &arg : argList){
+            if (arg == QLatin1String("--version")) {
                 fprintf(stdout, "pianobooster " PB_VERSION "\n");
-                exit(0);
+                return EXIT_SUCCESS;
             }
         }
     }
 
     QApplication app(argc, argv);
-
-    if (!QGLFormat::hasOpenGL()) {
-        QMessageBox::information(nullptr, QMessageBox::tr("OpenGL support"),
-                 QMessageBox::tr("This system does not support OpenGL which is needed to run Piano Booster."));
-        return -1;
-    }
-
     QtWindow window;
-
     window.show();
 
     int value = app.exec();

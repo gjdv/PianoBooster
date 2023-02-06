@@ -32,6 +32,7 @@
 #include "GuiTopBar.h"
 #include "TrackList.h"
 #include "Conductor.h"
+#include "Draw.h"
 
 GuiSidePanel::GuiSidePanel(QWidget *parent, CSettings* settings)
     : QWidget(parent), m_parent(parent)
@@ -82,7 +83,6 @@ void GuiSidePanel::init(CSong* songObj, CTrackList* trackList, GuiTopBar* topBar
 
     on_rhythmTappingCombo_activated(m_settings->value("SidePanel/rhythmTapping",0).toInt());
     rhythmTappingCombo->setCurrentIndex(m_song->cfg_rhythmTapping);
-
     repeatSong->setChecked(m_settings->value("SidePanel/repeatSong",false).toBool());
     connect(repeatSong,SIGNAL(stateChanged(int)),this,SLOT(on_repeatSong_released()));
 
@@ -105,22 +105,29 @@ void GuiSidePanel::init(CSong* songObj, CTrackList* trackList, GuiTopBar* topBar
     connect(act, SIGNAL(triggered()), this, SLOT(clearTrackPart()));
 
     trackListWidget->setContextMenuPolicy(Qt::ActionsContextMenu);
+
+    m_settings->setValue("SidePanel/clefRight",PB_SYMBOL_gClef);
+	m_settings->setValue("SidePanel/clefLeft",PB_SYMBOL_fClef);
+    clefRightCombo->addItem(tr("Treble"),PB_SYMBOL_gClef);
+    clefRightCombo->addItem(tr("Bass"),PB_SYMBOL_fClef);
+    clefLeftCombo->addItem(tr("Treble"),PB_SYMBOL_gClef);
+    clefLeftCombo->addItem(tr("Bass"),PB_SYMBOL_fClef);
+    clefRightCombo->setCurrentIndex(0);
+    clefLeftCombo->setCurrentIndex(1);
+    trackListWidget->addAction(act);
+    connect(clefRightCombo, SIGNAL(currentTextChanged(QString)), this, SLOT(on_clefRightComboChange(QString)));
+    connect(clefLeftCombo, SIGNAL(currentTextChanged(QString)), this, SLOT(on_clefLeftComboChange(QString)));
 }
 
 void GuiSidePanel::refresh() {
     if (m_trackList)
     {
         m_trackList->refresh();
-
         trackListWidget->clear();
-
         trackListWidget->addItems(m_trackList->getAllChannelProgramNames());
-
         trackListWidget->setCurrentRow(m_trackList->getActiveItemIndex());
-
         for (int i = 0; i < trackListWidget->count(); i++)
             m_trackList->changeListWidgetItemView(i, trackListWidget->item(i));
-
     }
     autoSetMuteYourPart();
 }
@@ -162,6 +169,7 @@ void GuiSidePanel::on_bookCombo_activated (int index)
 
 void GuiSidePanel::on_songCombo_activated(int index)
 {
+    Q_UNUSED(index)
     m_settings->setCurrentSongName(songCombo->currentText());
 }
 
@@ -200,7 +208,7 @@ void GuiSidePanel::autoSetMuteYourPart()
     m_song->mutePianistPart(checked);
 }
 
-void GuiSidePanel::setSongName(QString songName)
+void GuiSidePanel::setSongName(const QString &songName)
 {
     for (int i = 0; i < songCombo->count(); ++i)
     {
@@ -209,7 +217,7 @@ void GuiSidePanel::setSongName(QString songName)
     }
 }
 
-void GuiSidePanel::setBookName(QString bookName)
+void GuiSidePanel::setBookName(const QString &bookName)
 {
     for (int i = 0; i < bookCombo->count(); ++i)
     {
@@ -219,7 +227,7 @@ void GuiSidePanel::setBookName(QString bookName)
 }
 
 // pass either 'left' 'right' or 'both'
-void GuiSidePanel::setCurrentHand(QString hand)
+void GuiSidePanel::setCurrentHand(const QString &hand)
 {
     if (hand == "left")
         leftHandRadio->setChecked(true);
@@ -273,23 +281,30 @@ void GuiSidePanel::updateTranslate(){
 
     rhythmTappingCombo->setItemText(0,tr("Drums"));
     rhythmTappingCombo->setItemText(1,tr("Melody"));
+    clefRightCombo->setItemText(0,tr("Treble"));
+	clefRightCombo->setItemText(1,tr("Bass"));
+    clefLeftCombo->setItemText(0,tr("Treble"));
+	clefLeftCombo->setItemText(1,tr("Bass"));
 
     retranslateUi(this);
 
     // ---  smart resize panel  --- //
     int maxDeltaWidth=0;
     this->setMaximumWidth(300); // default
-    QVector<QWidget*> listCheckWidget {label2,listenRadio,rhythmTapRadio,followYouRadio,playAlongRadio,rightHandRadio,bothHandsRadio,leftHandRadio};
+    QVector<QWidget*> listCheckWidget {label2,listenRadio,rhythmTapRadio,followYouRadio,playAlongRadio,rightHandRadio,bothHandsRadio,leftHandRadio,clefRightCombo,clefLeftCombo};
 
     for (QWidget* w:listCheckWidget){
         int delta = 0;
         QFontMetrics fm(w->font());
 
-        QLabel *lb = dynamic_cast<QLabel*>(w);
-        if (lb) delta=fm.width(lb->text())-lb->width();
+#if (QT_VERSION < QT_VERSION_CHECK(5, 11, 0)) // keep compat with Qt < 5.11
+#define horizontalAdvance width
+#endif
+        auto *const lb = qobject_cast<QLabel*>(w);
+        if (lb) delta=fm.horizontalAdvance(lb->text())-lb->width();
 
-        QRadioButton *rb = dynamic_cast<QRadioButton*>(w);
-        if (rb) delta=fm.width(rb->text())-(rb->width()-32);
+        auto *const rb = qobject_cast<QRadioButton*>(w);
+        if (rb) delta=fm.horizontalAdvance(rb->text())-(rb->width()-32);
 
         if (delta>maxDeltaWidth) maxDeltaWidth=delta;
     }
@@ -314,3 +329,9 @@ void GuiSidePanel::on_rhythmTappingCombo_activated (int index)
     autoSetMuteYourPart();
 }
 
+void GuiSidePanel::on_clefComboChange (const QString &name, int value)
+{
+    m_settings->setValue(name,value);
+    CDraw::forceCompileRedraw();
+    m_song->refreshScroll();
+}
