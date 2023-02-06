@@ -47,7 +47,7 @@ MESSAGE("CMAKE_INSTALL_BINDIR: " ${CMAKE_INSTALL_BINDIR})
 set(OpenGL_GL_PREFERENCE "GLVND")
 FIND_PACKAGE( OpenGL REQUIRED )
 
-if(NOT WIN32)
+if(NOT WIN32 OR MINGW)
    # the `pkg_check_modules` function is created with this call
    include(FindPkgConfig)
    FIND_PACKAGE( PkgConfig REQUIRED )
@@ -62,7 +62,15 @@ if(USE_FTGL)
       SET(FTGL_INCLUDE_DIR ${FTGL_INCLUDE_DIRS})
       SET(FTGL_LIBRARY ${FTGL_LIBRARIES})
    else()
-      FIND_PACKAGE( ftgl REQUIRED )
+      FIND_PACKAGE(FTGL REQUIRED)
+
+      # add include path for freetype2 as ftgl uses freetype2 headers but doesn't pull in the include path automatically
+      if (COMMAND pkg_check_modules)
+          pkg_check_modules(FREETYPE2 freetype2)
+          if(FREETYPE2_FOUND)
+              LIST(APPEND FTGL_INCLUDE_DIR "${FREETYPE2_INCLUDE_DIRS}")
+          endif ()
+      endif ()
    endif()
 else(USE_FTGL)
     add_compile_options("-DNO_USE_FTGL")
@@ -113,7 +121,18 @@ if(WITH_INTERNAL_FLUIDSYNTH)
         INCLUDE_DIRECTORIES(${FLUIDSYNTH_INCLUDE_DIRS})
         SET(FLUIDSYNTH_LIBRARY ${FLUIDSYNTH_LIBRARIES})
     else()
-        FIND_PACKAGE( fluidsynth REQUIRED )
+        # find FluidSynth and link against its imported target
+        FIND_PACKAGE(FluidSynth REQUIRED)
+        SET(FLUIDSYNTH_LIBRARY FluidSynth::libfluidsynth)
+
+        # find additional dependencies that are pulled in by the imported target but not automatically made available
+        FIND_PACKAGE(OpenMP REQUIRED)
+        if (COMMAND pkg_check_modules)
+            pkg_check_modules(GLIB IMPORTED_TARGET glib-2.0 gthread-2.0)
+            pkg_check_modules(LIBSNDFILE IMPORTED_TARGET sndfile)
+            pkg_check_modules(PORTAUDIO IMPORTED_TARGET portaudio-2.0)
+            pkg_check_modules(READLINE IMPORTED_TARGET readline)
+        endif ()
     endif()
     ADD_DEFINITIONS(-DWITH_INTERNAL_FLUIDSYNTH)
     MESSAGE("Building with internal fluidsynth")
@@ -127,7 +146,7 @@ INCLUDE_DIRECTORIES(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_BINARY_DIR} ${OPENGL_INC
 SET(PB_BASE_SRCS MidiFile.cpp MidiTrack.cpp Song.cpp Conductor.cpp Util.cpp
     Chord.cpp Tempo.cpp MidiDevice.cpp MidiDeviceRt.cpp ${PB_BASE_SRCS})
 SET(PB_BASE_HDR MidiFile.h MidiTrack.h Song.h Conductor.h Rating.h Util.h
-    Chord.h Tempo.h MidiDevice.h)
+    Chord.h Tempo.h MidiDevice.h MidiDeviceRt.h)
 
 if(USE_JACK)
     # Check for Jack
@@ -189,6 +208,30 @@ SET( PIANOBOOSTER_SRCS
     pianobooster.rc
     images/pianobooster.ico
 )
+SET( PIANOBOOSTER_HDR
+    QtWindow.h
+    GuiTopBar.h
+    GuiSidePanel.h
+    GuiMidiSetupDialog.h
+    GuiKeyboardSetupDialog.h
+    GuiPreferencesDialog.h
+    GuiSongDetailsDialog.h
+    GuiLoopingPopup.h
+    GlView.h
+    ${PB_BASE_HDR}
+    StavePosition.h
+    Score.h
+    Cfg.h
+    Piano.h
+    Draw.h
+    Scroll.h
+    Notation.h
+    TrackList.h
+    Rating.h
+    Bar.h
+    Settings.h
+    Merge.h
+)
 
 # another list, this time it includes all header files that should be treated with moc
 SET( PIANOBOOSTER_MOC_HDRS
@@ -244,7 +287,7 @@ if(APPLE)
     ADD_EXECUTABLE( pianobooster MACOSX_BUNDLE
         ${pianobooster_ICON} ${pianobooster_TRANSLATIONS}
         ${pianobooster_MUSIC} ${pianobooster_FONT}
-        ${PIANOBOOSTER_SRCS}
+        ${PIANOBOOSTER_HDR} ${PIANOBOOSTER_SRCS}
         ${PIANOBOOSTER_MOC_SRCS} ${PIANOBOOSTER_RC_SRCS}
         ${PIANOBOOSTER_UI_HDRS} ${PIANOBOOSTER_RCS} )
 
@@ -253,13 +296,13 @@ if(APPLE)
 endif(APPLE)
 
 if(UNIX AND NOT APPLE)
-    ADD_EXECUTABLE( pianobooster ${PIANOBOOSTER_SRCS}
+    ADD_EXECUTABLE( pianobooster ${PIANOBOOSTER_HDR} ${PIANOBOOSTER_SRCS}
         ${PIANOBOOSTER_MOC_SRCS} ${PIANOBOOSTER_RC_SRCS}
         ${PIANOBOOSTER_UI_HDRS} ${PIANOBOOSTER_RCS} )
 endif(UNIX AND NOT APPLE)
 
 if(WIN32)
-    ADD_EXECUTABLE( pianobooster ${PIANOBOOSTER_SRCS}
+    ADD_EXECUTABLE( pianobooster ${PIANOBOOSTER_HDR} ${PIANOBOOSTER_SRCS}
         ${PIANOBOOSTER_MOC_SRCS} ${PIANOBOOSTER_RC_SRCS}
         ${PIANOBOOSTER_UI_HDRS} ${PIANOBOOSTER_RCS} )
     SET_TARGET_PROPERTIES(pianobooster PROPERTIES LINK_FLAGS "-mwindows")
