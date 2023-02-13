@@ -107,7 +107,7 @@ void GuiSidePanel::init(CSong* songObj, CTrackList* trackList, GuiTopBar* topBar
     trackListWidget->setContextMenuPolicy(Qt::ActionsContextMenu);
 
     m_settings->setValue("SidePanel/clefRight",PB_SYMBOL_gClef);
-	m_settings->setValue("SidePanel/clefLeft",PB_SYMBOL_fClef);
+    m_settings->setValue("SidePanel/clefLeft",PB_SYMBOL_fClef);
     clefRightCombo->addItem(tr("Treble"),PB_SYMBOL_gClef);
     clefRightCombo->addItem(tr("Bass"),PB_SYMBOL_fClef);
     clefLeftCombo->addItem(tr("Treble"),PB_SYMBOL_gClef);
@@ -282,9 +282,9 @@ void GuiSidePanel::updateTranslate(){
     rhythmTappingCombo->setItemText(0,tr("Drums"));
     rhythmTappingCombo->setItemText(1,tr("Melody"));
     clefRightCombo->setItemText(0,tr("Treble"));
-	clefRightCombo->setItemText(1,tr("Bass"));
+    clefRightCombo->setItemText(1,tr("Bass"));
     clefLeftCombo->setItemText(0,tr("Treble"));
-	clefLeftCombo->setItemText(1,tr("Bass"));
+    clefLeftCombo->setItemText(1,tr("Bass"));
 
     retranslateUi(this);
 

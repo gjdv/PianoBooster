@@ -160,7 +160,7 @@ public:
 
     void setClef(int clef = -1)
     {
-    	m_stavePos.notePos(m_hand, m_midiNote, clef);
+        m_stavePos.notePos(m_hand, m_midiNote, clef);
     }
 
 private:
